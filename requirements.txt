@@ -109,7 +109,6 @@ pandocfilters==1.5.0
 parso==0.8.3
 passlib==1.7.4
 pathy==0.10.1
-pdfminer.six==20191110
 pdfplumber==0.9.0
 pexpect==4.8.0
 phonenumbers==8.13.10
