@@ -260,3 +260,84 @@ async def generate_sales_email(request: SalesEmailRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error generating sales email")
+
+
+
+
+# Endpoint to generate the email
+@app.post("/api/generate-sales-email", response_model=SalesEmailResponse)
+async def generate_sales_email(request: SalesEmailRequest):
+    product_description = request.productDescription
+    target_client = request.targetClient
+    
+    # Construct the prompt to send to GPT
+    prompt = f"""
+    You are a sales expert. Generate a sales email for a client based on the following details:
+    
+    Product Description: {product_description}
+    Target Client: {target_client}
+    
+    The email should be formal and professional, with a catchy subject line and engaging content and of 100 words.
+    """
+    
+    try:
+        # Call OpenAI API to generate the email
+        response = openai.Completion.create(
+            model="gpt-3.5-turbo",
+            prompt=prompt,
+            max_tokens=200,
+            temperature=0.7,
+        )
+        email_content = response.choices[0].text.strip()
+
+        # Construct a subject line
+        email_subject = f"Introducing {product_description.split()[0]} to {target_client} - A Perfect Fit"
+
+        return SalesEmailResponse(emailSubject=email_subject, emailContent=email_content)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Error generating sales email")
+    
+    
+@app.post("/api/projects/{project_id}/generate-gantt")
+async def generate_gantt_data(project_id: str):
+    project = load_projects().get("projects", {}).get(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    prompt = f"""
+You are a project manager. Given the following project and team, break it down into a Gantt chart JSON.
+Each task must have:
+- id
+- name
+- assignee
+- start (in YYYY-MM-DD)
+- end (in YYYY-MM-DD)
+- dependencies (optional)
+
+Use current date and deadline to auto-distribute. Also give output in JSON format so that frappe-gantt library can use data to plot gantt chart.
+
+Project:
+Name: {project.get("name")}
+Deadline: {project.get("deadline")}
+Team:
+{project.get("team_members", [])}
+
+Tech Stack: {project.get("techStack")}
+Stage: {project.get("currentStage")}
+Buffer Days: {project.get("buffer", 0)}
+"""
+
+    try:
+        res = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You generate structured JSON for a Gantt chart. Return only JSON."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.5
+        )
+        gantt_data = res.choices[0].message.content.strip()
+        return {"gantt": gantt_data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Gantt generation error: {str(e)}")
